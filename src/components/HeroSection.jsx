@@ -2,8 +2,8 @@
 // This is the animated, glassy hero section for the DevForge Landing layout.
 // Customize the headline, subheadline, and call-to-action below.
 // You can also adjust the animation and glassmorphism styles as needed.
-import React, { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import React, { useState, useEffect, useMemo } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
 import { FaEdit } from 'react-icons/fa';
 import { useEditMode } from '../context/EditModeContext';
 
@@ -141,9 +141,51 @@ function Wave({ color, duration, delay, amplitude = 12, frequency = 1, opacity =
   );
 }
 
-export default function HeroSection() {
-  const { editMode } = useEditMode();
+// Helper to dynamically import all images for a theme
+function useThemeBackgrounds(theme) {
+  return useMemo(() => {
+    if (theme === 'purpleHaze') {
+      return Object.values(import.meta.glob('../assets/backgrounds/purple/*.png', { eager: true, import: 'default' }));
+    } else if (theme === 'greenGlass') {
+      return Object.values(import.meta.glob('../assets/backgrounds/green/*.png', { eager: true, import: 'default' }));
+    }
+    return [];
+  }, [theme]);
+}
+
+export default function HeroSection({ theme, pendingBg, setPendingBg, editMode }) {
+  const images = useThemeBackgrounds(theme);
+  useEffect(() => {
+    console.log('[HeroSection] theme:', theme);
+    console.log('[HeroSection] images:', images);
+  }, [theme, images]);
+  // For purpleHaze, always use the first purple image
+  const [selectedBg, setSelectedBg] = useState(() => {
+    if (theme === 'purpleHaze') {
+      return images[0] || null;
+    }
+    if (pendingBg && images.includes(pendingBg)) return pendingBg;
+    const saved = localStorage.getItem(`heroBg_${theme}`);
+    return (saved && images.includes(saved)) ? saved : images[0] || null;
+  });
+  useEffect(() => {
+    if (theme === 'purpleHaze') {
+      setSelectedBg(images[0] || null);
+      return;
+    }
+    if (pendingBg && images.includes(pendingBg)) {
+      setSelectedBg(pendingBg);
+    }
+  }, [pendingBg, images, theme]);
+  useEffect(() => {
+    if (selectedBg && theme !== 'purpleHaze') localStorage.setItem(`heroBg_${theme}`, selectedBg);
+  }, [selectedBg, theme]);
+  useEffect(() => {
+    console.log('[HeroSection] selectedBg:', selectedBg);
+  }, [selectedBg]);
+  const [showPicker, setShowPicker] = useState(false);
   const [hero, setHero] = useState(defaultHero);
+
   // Load/save hero edits
   useEffect(() => {
     const saved = localStorage.getItem(LS_KEY);
@@ -153,18 +195,111 @@ export default function HeroSection() {
     localStorage.setItem(LS_KEY, JSON.stringify(hero));
   }, [hero]);
 
+  // Update selectedBg if theme or images change, but only if the saved value is valid and different
+  useEffect(() => {
+    const saved = localStorage.getItem(`heroBg_${theme}`);
+    if (saved && images.includes(saved) && saved !== selectedBg) {
+      setSelectedBg(saved);
+    } else if (!saved && images[0] && selectedBg !== images[0]) {
+      setSelectedBg(images[0]);
+    }
+    // else do nothing (prevents flicker)
+    // eslint-disable-next-line
+  }, [theme, images]);
+
+  useEffect(() => {
+    if (pendingBg && images.includes(pendingBg)) {
+      setSelectedBg(pendingBg);
+    }
+  }, [pendingBg, images]);
+  useEffect(() => {
+    if (selectedBg) localStorage.setItem(`heroBg_${theme}`, selectedBg);
+  }, [selectedBg, theme]);
+
   const typedTagline = useTypewriter(hero.tagline, 30);
   const typedCode = useMultiCodeTypewriter(hero.code, 14, 1200);
 
+  // Determine gradient classes based on theme
+  let gradientClass = 'bg-gradient-to-br from-primary to-secondary dark:from-darkPrimary dark:to-darkSecondary';
+  if (theme === 'purpleHaze') {
+    gradientClass = 'bg-gradient-to-br from-purpleHazeLightFrom to-purpleHazeLightTo dark:from-purpleHazeDarkFrom dark:to-purpleHazeDarkTo';
+  } else if (theme === 'greenGlass') {
+    gradientClass = 'bg-gradient-to-br from-greenGlassLightFrom to-greenGlassLightTo dark:from-greenGlassDarkFrom dark:to-greenGlassDarkTo';
+  }
+
+  // Only update background if a new image is selected
+  const handleSelectBg = (img) => {
+    if (img !== selectedBg) {
+      setSelectedBg(img);
+    }
+    setShowPicker(false);
+  };
+
   return (
-    <section className="relative min-h-[70vh] w-full flex flex-col items-center justify-center text-center bg-gradient-to-br from-primary to-secondary overflow-hidden">
+    <section className={`relative min-h-[70vh] w-full flex flex-col items-center justify-center text-center ${gradientClass} overflow-hidden`}>
+      {/* Animated Background Image */}
+      <AnimatePresence mode="wait">
+        {selectedBg && (
+          <motion.img
+            key={selectedBg}
+            src={selectedBg}
+            alt="Hero Background"
+            className="absolute inset-0 w-full h-full object-cover z-0"
+            style={{ pointerEvents: 'none' }}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.5 }}
+          />
+        )}
+      </AnimatePresence>
+      {/* Overlay for readability */}
+      <div className="absolute inset-0 bg-black/20 z-10" />
       {/* Subtle animated frequency waves */}
       <Wave color="wave1" duration={18} delay={0} amplitude={14} frequency={1} opacity={0.16} />
       <Wave color="wave2" duration={24} delay={2} amplitude={8} frequency={2} opacity={0.12} reverse />
       {/* Glassmorphism overlay */}
-      <div className="absolute inset-0 bg-white/10 backdrop-blur-lg z-0" />
+      <div className="absolute inset-0 bg-white/10 backdrop-blur-lg z-20" />
+      {/* Picker logic only for greenGlass */}
+      {theme === 'greenGlass' && editMode && images.length > 1 && (
+        <button
+          className="fixed bottom-8 right-8 z-40 bg-white/80 dark:bg-gray-800/80 border border-gray-300 dark:border-gray-700 rounded-full p-3 shadow hover:scale-110 transition"
+          onClick={() => setShowPicker(v => !v)}
+          title="Change Background"
+        >
+          <span role="img" aria-label="Change Background">🖼️</span>
+        </button>
+      )}
+      {/* Picker Modal only for greenGlass */}
+      <AnimatePresence>
+        {theme === 'greenGlass' && editMode && showPicker && (
+          <motion.div
+            className="fixed inset-0 z-50 flex items-center justify-center bg-black/40"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            onClick={() => setShowPicker(false)}
+          >
+            <div
+              className="bg-white dark:bg-gray-900 rounded-xl shadow-xl p-6 flex gap-4 flex-wrap max-w-2xl border border-gray-200 dark:border-gray-700"
+              onClick={e => e.stopPropagation()}
+            >
+              {images.map(img => (
+                <button
+                  key={img}
+                  className={`rounded-lg overflow-hidden border-4 ${selectedBg === img ? 'border-accent' : 'border-transparent'} focus:outline-none focus:ring-2 focus:ring-accent`}
+                  onClick={() => handleSelectBg(img)}
+                  title={selectedBg === img ? 'Current Background' : 'Set as Background'}
+                >
+                  <img src={img} alt="bg option" className="w-32 h-20 object-cover" />
+                </button>
+              ))}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       <motion.div
-        className="relative z-10 p-8 flex flex-col items-center"
+        className="relative z-30 p-8 flex flex-col items-center"
         initial={{ opacity: 0, y: 40 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 1 }}
@@ -192,14 +327,6 @@ export default function HeroSection() {
           Powered by Ryo-Cli
         </p>
         {/* Call to Action Button */}
-        <EditableText
-          value={hero.button}
-          onSave={val => setHero(h => ({ ...h, button: val }))}
-          className="inline-block"
-          inputClass="text-lg md:text-xl font-bold text-black bg-white/80 rounded px-2 py-1"
-          editMode={editMode}
-          as="input"
-        />
         <a
           href="#contact"
           className="inline-block px-8 py-3 bg-accent text-white font-bold rounded-full shadow-lg hover:bg-secondary transition-colors ml-4"
