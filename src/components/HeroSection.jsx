@@ -240,17 +240,29 @@ export default function HeroSection({ theme, pendingBg, setPendingBg, editMode }
       {/* Animated Background Image */}
       <AnimatePresence mode="wait">
         {selectedBg && (
-          <motion.img
+          <motion.div
             key={selectedBg}
-            src={selectedBg}
-            alt="Hero Background"
-            className="absolute inset-0 w-full h-full object-cover z-0"
-            style={{ pointerEvents: 'none' }}
+            className="absolute inset-0 z-0 overflow-hidden"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             transition={{ duration: 0.5 }}
-          />
+          >
+            <img
+              src={selectedBg}
+              alt="Hero Background"
+              className="w-auto h-auto max-w-none max-h-none"
+              style={{
+                pointerEvents: 'none',
+                position: 'absolute',
+                top: '50%',
+                left: '50%',
+                transform: 'translate(-50%, -50%)',
+                minWidth: '100%',
+                minHeight: '100%'
+              }}
+            />
+          </motion.div>
         )}
       </AnimatePresence>
       {/* Overlay for readability */}
