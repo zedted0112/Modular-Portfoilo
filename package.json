@@ -3,7 +3,7 @@
   "private": true,
   "version": "0.0.0",
   "type": "module",
-  "homepage": "https://yourusername.github.io/modular-portfolio",
+  "homepage": "https://zedted0112.github.io/Modular-Portfoilo",
   "scripts": {
     "dev": "vite --port 5173",
     "build": "vite build",
